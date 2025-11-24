@@ -109,20 +109,42 @@ app.use(rateLimiters.general);
 // Health check endpoint with comprehensive monitoring
 app.get('/health', async (req, res) => {
     try {
-        const health = await performHealthCheck();
+        // Basic MongoDB connection check
+        const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
         
-        // Add Socket.IO connection stats for Atlas monitoring
-        const { getConnectionStats } = require('./src/config/socket');
-        const connectionStats = getConnectionStats();
-        health.socketConnections = connectionStats;
+        const health = {
+            status: dbStatus === 'connected' ? 'healthy' : 'unhealthy',
+            timestamp: new Date().toISOString(),
+            database: dbStatus,
+            atlas: {
+                connected: dbStatus === 'connected',
+                host: mongoose.connection.host || 'not connected',
+                readyState: mongoose.connection.readyState,
+                connectionCount: mongoose.connections.length
+            }
+        };
         
-        // Atlas Free Tier warning if connections are high
-        if (connectionStats.current > 20) {
-            health.atlasWarning = 'High connection count - consider Atlas upgrade for better performance';
+        // Add detailed connection info if connected
+        if (dbStatus === 'connected') {
+            health.atlas.name = mongoose.connection.name;
+            health.atlas.port = mongoose.connection.port;
         }
         
-        const statusCode = health.status === 'healthy' ? 200 : 
-                          health.status === 'degraded' ? 200 : 503;
+        // Add Socket.IO connection stats for Atlas monitoring
+        try {
+            const { getConnectionStats } = require('./src/config/socket');
+            const connectionStats = getConnectionStats();
+            health.socketConnections = connectionStats;
+            
+            // Atlas Free Tier warning if connections are high
+            if (connectionStats.current > 20) {
+                health.atlasWarning = 'High connection count - consider Atlas upgrade for better performance';
+            }
+        } catch (socketError) {
+            health.socketConnections = { error: 'Socket stats unavailable' };
+        }
+        
+        const statusCode = health.status === 'healthy' ? 200 : 503;
         
         res.status(statusCode).json({
             ...health,
@@ -134,6 +156,11 @@ app.get('/health', async (req, res) => {
         res.status(503).json({
             status: 'unhealthy',
             message: 'Health check failed',
+            error: error.message,
+            atlas: {
+                connected: false,
+                issue: 'Possible IP whitelist or authentication problem'
+            },
             timestamp: new Date().toISOString(),
             environment: NODE_ENV
         });
