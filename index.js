@@ -106,6 +106,25 @@ if (NODE_ENV === 'development') {
 // Apply general rate limiting to all routes
 app.use(rateLimiters.general);
 
+// Root endpoint - API info
+app.get('/', (req, res) => {
+    res.status(200).json({
+        message: 'Chattr Backend API',
+        status: 'running',
+        version: process.env.npm_package_version || '1.0.0',
+        environment: NODE_ENV,
+        endpoints: {
+            health: '/health',
+            auth: '/api/auth',
+            users: '/api/user',
+            friends: '/api/friends',
+            messages: '/api/messages',
+            status: '/api/online-status'
+        },
+        documentation: 'https://github.com/Dhruv-158/Backend-chatter'
+    });
+});
+
 // Health check endpoint with comprehensive monitoring
 app.get('/health', async (req, res) => {
     try {
@@ -165,6 +184,11 @@ app.get('/health', async (req, res) => {
             environment: NODE_ENV
         });
     }
+});
+
+// Favicon handler (prevents 404s)
+app.get('/favicon.ico', (req, res) => {
+    res.status(204).send(); // No content response
 });
 
 // API routes
