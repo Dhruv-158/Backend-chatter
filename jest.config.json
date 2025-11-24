@@ -1,0 +1,30 @@
+{
+  "testEnvironment": "node",
+  "testMatch": [
+    "**/__tests__/**/*.test.js",
+    "**/?(*.)+(spec|test).js"
+  ],
+  "testPathIgnorePatterns": [
+    "/node_modules/",
+    "/dist/",
+    "/uploads/"
+  ],
+  "coverageDirectory": "coverage",
+  "coverageReporters": [
+    "text",
+    "lcov",
+    "html"
+  ],
+  "collectCoverageFrom": [
+    "src/**/*.js",
+    "index.js",
+    "!src/**/*.test.js",
+    "!src/utils/logger.js"
+  ],
+  "setupFilesAfterEnv": [],
+  "testTimeout": 30000,
+  "verbose": true,
+  "forceExit": true,
+  "detectOpenHandles": true,
+  "maxWorkers": "50%"
+}

@@ -1,0 +1,49 @@
+# 🔧 Render Deployment Configuration
+
+# Build Command (automatically detected)
+build = "npm install"
+
+# Start Command
+start = "npm run render-start"
+
+# Health Check Path
+healthCheckPath = "/health"
+
+# Environment
+[env]
+NODE_ENV = "production"
+
+# Auto-deploy settings
+[deploy]
+branch = "main"
+auto_deploy = true
+
+# Build settings
+[build]
+publish_directory = "."
+build_command = "npm install"
+
+# Headers for better performance
+[[headers]]
+for = "/uploads/*"
+[headers.values]
+Cache-Control = "public, max-age=31536000"
+Access-Control-Allow-Origin = "*"
+
+[[headers]]
+for = "/api/*"
+[headers.values]
+Access-Control-Allow-Origin = "*"
+Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
+Access-Control-Allow-Headers = "Content-Type, Authorization"
+
+# Redirects for SPA support (if needed)
+[[redirects]]
+from = "/api/*"
+to = "/api/:splat"
+status = 200
+
+# Health check configuration
+[health_check]
+path = "/health"
+port = "$PORT"
