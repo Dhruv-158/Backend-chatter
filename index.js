@@ -125,6 +125,11 @@ app.get('/', (req, res) => {
     });
 });
 
+// Favicon handler (prevents 404s)
+app.get('/favicon.ico', (req, res) => {
+    res.status(204).send();
+});
+
 // Health check endpoint with comprehensive monitoring
 app.get('/health', async (req, res) => {
     try {
