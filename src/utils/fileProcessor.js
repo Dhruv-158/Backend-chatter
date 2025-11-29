@@ -5,15 +5,25 @@ const path = require('path');
 const fs = require('fs').promises;
 const axios = require('axios');
 const cheerio = require('cheerio');
+const { cloudinary } = require('../config/cloudinary');
 
 // Set FFmpeg path
 ffmpeg.setFfmpegPath(ffmpegPath);
 
 /**
  * Generate thumbnail for image
+ * For Cloudinary: Returns a transformed URL
  */
 const generateImageThumbnail = async (imagePath) => {
     try {
+        // If it's a Cloudinary URL, use transformations
+        if (imagePath.includes('cloudinary.com')) {
+            // Insert transformation before the version/filename
+            // Example: .../upload/v1234/id.jpg -> .../upload/w_300,c_limit/v1234/id.jpg
+            return imagePath.replace('/upload/', '/upload/w_300,c_limit/');
+        }
+
+        // Local fallback (should not be reached in production with Cloudinary)
         const filename = path.basename(imagePath);
         const thumbnailPath = path.join('./uploads/thumbnails', `thumb-${filename}`);
 
@@ -28,14 +38,19 @@ const generateImageThumbnail = async (imagePath) => {
         return `/uploads/thumbnails/thumb-${filename}`;
     } catch (error) {
         console.error('Error generating image thumbnail:', error);
-        return null;
+        return imagePath; // Return original if failure
     }
 };
 
 /**
  * Compress image
+ * For Cloudinary: No-op (handled by upload params)
  */
 const compressImage = async (imagePath) => {
+    if (imagePath.includes('cloudinary.com')) {
+        return true; // Already compressed by Cloudinary
+    }
+    
     try {
         const tempPath = imagePath + '.temp';
         
@@ -60,8 +75,16 @@ const compressImage = async (imagePath) => {
 
 /**
  * Generate thumbnail for video
+ * For Cloudinary: Returns a transformed URL (jpg format, 2nd second)
  */
-const generateVideoThumbnail = (videoPath) => {
+const generateVideoThumbnail = async (videoPath) => {
+    if (videoPath.includes('cloudinary.com')) {
+        // Change extension to .jpg and add transformation
+        // .../upload/v123/video.mp4 -> .../upload/so_2.0,w_300,c_limit,f_jpg/v123/video.jpg
+        const urlWithoutExt = videoPath.substring(0, videoPath.lastIndexOf('.'));
+        return urlWithoutExt.replace('/upload/', '/upload/so_2.0,w_300,c_limit,f_jpg/') + '.jpg';
+    }
+
     return new Promise((resolve, reject) => {
         const filename = path.basename(videoPath, path.extname(videoPath));
         const thumbnailPath = path.join('./uploads/thumbnails', `thumb-${filename}.jpg`);
@@ -85,8 +108,25 @@ const generateVideoThumbnail = (videoPath) => {
 
 /**
  * Get video duration
+ * For Cloudinary: Uses API to fetch resource metadata
  */
-const getVideoDuration = (videoPath) => {
+const getVideoDuration = async (videoPath) => {
+    if (videoPath.includes('cloudinary.com')) {
+        try {
+            // Extract public_id from URL
+            // URL format: .../upload/v1234/folder/public_id.mp4
+            const matches = videoPath.match(/\/upload\/(?:v\d+\/)?(.+)\.[^.]+$/);
+            if (matches && matches[1]) {
+                const publicId = matches[1];
+                const resource = await cloudinary.api.resource(publicId, { resource_type: 'video' });
+                return Math.round(resource.duration);
+            }
+        } catch (error) {
+            console.error('Error getting Cloudinary video duration:', error.message);
+            return 0;
+        }
+    }
+
     return new Promise((resolve, reject) => {
         ffmpeg.ffprobe(videoPath, (err, metadata) => {
             if (err) {
@@ -102,8 +142,25 @@ const getVideoDuration = (videoPath) => {
 
 /**
  * Get audio duration
+ * For Cloudinary: Uses API to fetch resource metadata
  */
-const getAudioDuration = (audioPath) => {
+const getAudioDuration = async (audioPath) => {
+    if (audioPath.includes('cloudinary.com')) {
+        try {
+            // Extract public_id from URL
+            const matches = audioPath.match(/\/upload\/(?:v\d+\/)?(.+)\.[^.]+$/);
+            if (matches && matches[1]) {
+                const publicId = matches[1];
+                // Audio is often treated as 'video' resource_type in Cloudinary API for duration
+                const resource = await cloudinary.api.resource(publicId, { resource_type: 'video' });
+                return Math.round(resource.duration);
+            }
+        } catch (error) {
+            console.error('Error getting Cloudinary audio duration:', error.message);
+            return 0;
+        }
+    }
+
     return new Promise((resolve, reject) => {
         ffmpeg.ffprobe(audioPath, (err, metadata) => {
             if (err) {
@@ -172,9 +229,25 @@ const extractLinkMetadata = async (url) => {
 };
 
 /**
- * Delete file from filesystem
+ * Delete file from filesystem or Cloudinary
  */
 const deleteFile = async (filePath) => {
+    if (filePath.includes('cloudinary.com')) {
+        try {
+            // Extract public_id
+            const matches = filePath.match(/\/upload\/(?:v\d+\/)?(.+)\.[^.]+$/);
+            if (matches && matches[1]) {
+                const publicId = matches[1];
+                // Try deleting as image, then video/raw if not found (simplified)
+                await cloudinary.uploader.destroy(publicId);
+                return true;
+            }
+        } catch (error) {
+            console.error('Error deleting Cloudinary file:', error);
+            return false;
+        }
+    }
+
     try {
         const fullPath = path.join('.', filePath);
         await fs.unlink(fullPath);
@@ -189,6 +262,12 @@ const deleteFile = async (filePath) => {
  * Get file size
  */
 const getFileSize = async (filePath) => {
+    if (filePath.includes('cloudinary.com')) {
+        // Size is usually not needed for logic, but if needed, would require API call
+        // For now return 0 or mock, as it's mostly for display
+        return 0; 
+    }
+
     try {
         const stats = await fs.stat(filePath);
         return stats.size;

@@ -8,23 +8,46 @@ const REDIS_ENABLED = process.env.REDIS_ENABLED !== 'false';
 const redisConfig = (() => {
     // Check if we have a Redis URL (common in production)
     if (process.env.REDIS_URL) {
+        const parsedUrl = require('url').parse(process.env.REDIS_URL);
+        
+        // Extract auth
+        let username = undefined;
+        let password = undefined;
+        if (parsedUrl.auth) {
+            const parts = parsedUrl.auth.split(':');
+            if (parts.length === 2) {
+                username = parts[0];
+                password = parts[1];
+            } else {
+                password = parts[0];
+            }
+        }
+
         return {
-            ...require('url').parse(process.env.REDIS_URL),
+            host: parsedUrl.hostname, // ✅ Use hostname (no port)
+            port: parseInt(parsedUrl.port) || 6379, // ✅ Convert to number
+            username: username,
+            password: password,
+            // ✅ Force TLS for Upstash even if protocol is redis://
+            tls: process.env.REDIS_URL.includes('upstash') ? {
+                rejectUnauthorized: false // Sometimes needed for serverless Redis
+            } : undefined,
             retryStrategy(times) {
-                // ✅ Stop retrying after 3 attempts in development
-                if (!REDIS_ENABLED || times > 3) {
+                // ✅ Stop retrying after 5 attempts in development
+                if (!REDIS_ENABLED || times > 5) {
                     logger.warn('Redis connection failed - Running without Redis (WebSocket will work on single server only)');
                     return null; // Stop retrying
                 }
-                const delay = Math.min(times * 50, 2000);
+                const delay = Math.min(times * 100, 3000);
                 return delay;
             },
             maxRetriesPerRequest: 3,
             enableReadyCheck: true,
-            lazyConnect: true, // ✅ Don't connect immediately
-            enableOfflineQueue: false, // ✅ Fail fast if Redis is not available
-            connectTimeout: 10000, // 10 second timeout
-            commandTimeout: 5000,  // 5 second command timeout
+            lazyConnect: true, 
+            enableOfflineQueue: true, // ✅ Enable offline queue to prevent immediate crashes
+            connectTimeout: 10000, 
+            commandTimeout: 5000,
+            family: 4 // Force IPv4
         };
     }
     
@@ -34,20 +57,18 @@ const redisConfig = (() => {
         port: process.env.REDIS_PORT || 6379,
         password: process.env.REDIS_PASSWORD || undefined,
         retryStrategy(times) {
-            // ✅ Stop retrying after 3 attempts in development
-            if (!REDIS_ENABLED || times > 3) {
-                logger.warn('Redis connection failed - Running without Redis (WebSocket will work on single server only)');
-                return null; // Stop retrying
+            if (!REDIS_ENABLED || times > 5) {
+                logger.warn('Redis connection failed - Running without Redis');
+                return null;
             }
-            const delay = Math.min(times * 50, 2000);
-            return delay;
+            return Math.min(times * 100, 3000);
         },
         maxRetriesPerRequest: 3,
         enableReadyCheck: true,
-        lazyConnect: true, // ✅ Don't connect immediately
-        enableOfflineQueue: false, // ✅ Fail fast if Redis is not available
-        connectTimeout: 10000, // 10 second timeout
-        commandTimeout: 5000,  // 5 second command timeout
+        lazyConnect: true,
+        enableOfflineQueue: true, // ✅ Enable offline queue
+        connectTimeout: 10000,
+        commandTimeout: 5000,
     };
 })();
 

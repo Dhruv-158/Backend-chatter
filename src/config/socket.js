@@ -409,24 +409,20 @@ const setupSocket = (server) => {
 
     // ✅ FIX 9: Subscribe to Redis channels (only if Redis is enabled)
     if (redisSubscriber) {
-        try {
-            redisSubscriber.subscribe(
-                'new_message',
-                'message_read',
-                'message_deleted',
-                'user_typing',
-                'user_status',
-                (err, count) => {
-                    if (err) {
-                        logger.error(`Failed to subscribe to Redis channels: ${err.message}`, { error: err.stack });
-                    } else {
-                        logger.info(`✅ Subscribed to ${count} Redis channels for cross-server messaging`);
-                    }
-                }
-            );
-        } catch (error) {
-            logger.error(`Error setting up Redis subscription: ${error.message}`, { error: error.stack });
-        }
+        (async () => {
+            try {
+                await redisSubscriber.subscribe(
+                    'new_message',
+                    'message_read',
+                    'message_deleted',
+                    'user_typing',
+                    'user_status'
+                );
+                logger.info(`✅ Subscribed to 5 Redis channels for cross-server messaging`);
+            } catch (error) {
+                logger.error(`Failed to subscribe to Redis channels: ${error.message}`, { error: error.stack });
+            }
+        })();
 
         // ✅ FIX 10: Handle messages from Redis Pub/Sub with correct event names
         redisSubscriber.on('message', (channel, message) => {

@@ -3,6 +3,7 @@ const User = require('../models/User');
 const { AppError } = require('../utils/errorHandler');
 const fs = require('fs').promises;
 const path = require('path');
+const { deleteFile } = require('../utils/fileProcessor');
 
 /**
  * Search users by username or email
@@ -84,21 +85,25 @@ const changeProfilePictureService = async (userId, file) => {
         if (!user) {
             // Delete uploaded file if user not found
             if (file) {
-                await fs.unlink(file.path);
+                await deleteFile(file.path.includes('cloudinary.com') ? file.path : file.path);
             }
             throw new AppError('User not found', 404);
         }
+
         // Delete old profile picture if exists
         if (user.profilePicture) {
-            const oldImagePath = path.join(__dirname, '..', user.profilePicture);
             try {
-                await fs.unlink(oldImagePath);
+                // Use unified deleteFile which handles both Cloudinary and local files
+                await deleteFile(user.profilePicture);
             } catch (err) {
                 console.error('Error deleting old profile picture:', err);
             }
         }
-        // Store relative URL path (e.g., /uploads/profiles/filename.jpg)
-        user.profilePicture = `/uploads/profiles/${file.filename}`;
+
+        // Store file URL (Cloudinary or local)
+        const fileUrl = file.path.includes('cloudinary.com') ? file.path : `/uploads/profiles/${file.filename}`;
+        
+        user.profilePicture = fileUrl;
         user.updatedAt = Date.now();
         await user.save();
         return user;
@@ -106,7 +111,7 @@ const changeProfilePictureService = async (userId, file) => {
         // Delete uploaded file if error occurs
         if (file) {
             try {
-                await fs.unlink(file.path);
+                await deleteFile(file.path.includes('cloudinary.com') ? file.path : file.path);
             } catch (err) {
                 console.error('Error deleting file:', err);
             }

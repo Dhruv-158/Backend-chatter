@@ -63,7 +63,7 @@ const sendImageMessage = async (senderId, receiverId, file) => {
     try {
         await checkFriendship(senderId, receiverId);
 
-        // Compress image
+        // Compress image (skipped if Cloudinary)
         await compressImage(file.path);
 
         // Generate thumbnail
@@ -72,14 +72,17 @@ const sendImageMessage = async (senderId, receiverId, file) => {
         const conversationId = Message.generateConversationId(senderId, receiverId);
         const fileSize = await getFileSize(file.path);
 
+        // Determine file URL (Cloudinary or local)
+        const fileUrl = file.path.includes('cloudinary.com') ? file.path : `/uploads/images/${file.filename}`;
+
         const message = await Message.create({
             conversationId,
             sender: senderId,
             receiver: receiverId,
             messageType: 'image',
-            fileUrl: `/uploads/images/${file.filename}`,
+            fileUrl: fileUrl,
             fileName: file.originalname,
-            fileSize: fileSize,
+            fileSize: fileSize || file.size, // Fallback to multer size
             mimeType: file.mimetype,
             thumbnailUrl: thumbnailUrl
         });
@@ -94,7 +97,7 @@ const sendImageMessage = async (senderId, receiverId, file) => {
     } catch (error) {
         // Delete uploaded file if message creation fails
         if (file) {
-            await deleteFile(`/uploads/images/${file.filename}`);
+            await deleteFile(file.path.includes('cloudinary.com') ? file.path : `/uploads/images/${file.filename}`);
         }
         throw error;
     }
@@ -116,14 +119,17 @@ const sendVideoMessage = async (senderId, receiverId, file) => {
         const conversationId = Message.generateConversationId(senderId, receiverId);
         const fileSize = await getFileSize(file.path);
 
+        // Determine file URL (Cloudinary or local)
+        const fileUrl = file.path.includes('cloudinary.com') ? file.path : `/uploads/videos/${file.filename}`;
+
         const message = await Message.create({
             conversationId,
             sender: senderId,
             receiver: receiverId,
             messageType: 'video',
-            fileUrl: `/uploads/videos/${file.filename}`,
+            fileUrl: fileUrl,
             fileName: file.originalname,
-            fileSize: fileSize,
+            fileSize: fileSize || file.size,
             mimeType: file.mimetype,
             thumbnailUrl: thumbnailUrl,
             duration: duration
@@ -139,7 +145,7 @@ const sendVideoMessage = async (senderId, receiverId, file) => {
     } catch (error) {
         // Delete uploaded file if message creation fails
         if (file) {
-            await deleteFile(`/uploads/videos/${file.filename}`);
+            await deleteFile(file.path.includes('cloudinary.com') ? file.path : `/uploads/videos/${file.filename}`);
         }
         throw error;
     }
@@ -155,14 +161,17 @@ const sendDocumentMessage = async (senderId, receiverId, file) => {
         const conversationId = Message.generateConversationId(senderId, receiverId);
         const fileSize = await getFileSize(file.path);
 
+        // Determine file URL (Cloudinary or local)
+        const fileUrl = file.path.includes('cloudinary.com') ? file.path : `/uploads/documents/${file.filename}`;
+
         const message = await Message.create({
             conversationId,
             sender: senderId,
             receiver: receiverId,
             messageType: 'document',
-            fileUrl: `/uploads/documents/${file.filename}`,
+            fileUrl: fileUrl,
             fileName: file.originalname,
-            fileSize: fileSize,
+            fileSize: fileSize || file.size,
             mimeType: file.mimetype
         });
 
@@ -176,7 +185,7 @@ const sendDocumentMessage = async (senderId, receiverId, file) => {
     } catch (error) {
         // Delete uploaded file if message creation fails
         if (file) {
-            await deleteFile(`/uploads/documents/${file.filename}`);
+            await deleteFile(file.path.includes('cloudinary.com') ? file.path : `/uploads/documents/${file.filename}`);
         }
         throw error;
     }
@@ -195,14 +204,17 @@ const sendAudioMessage = async (senderId, receiverId, file) => {
         const conversationId = Message.generateConversationId(senderId, receiverId);
         const fileSize = await getFileSize(file.path);
 
+        // Determine file URL (Cloudinary or local)
+        const fileUrl = file.path.includes('cloudinary.com') ? file.path : `/uploads/audio/${file.filename}`;
+
         const message = await Message.create({
             conversationId,
             sender: senderId,
             receiver: receiverId,
             messageType: 'audio',
-            fileUrl: `/uploads/audio/${file.filename}`,
+            fileUrl: fileUrl,
             fileName: file.originalname,
-            fileSize: fileSize,
+            fileSize: fileSize || file.size,
             mimeType: file.mimetype,
             duration: duration
         });
@@ -217,7 +229,7 @@ const sendAudioMessage = async (senderId, receiverId, file) => {
     } catch (error) {
         // Delete uploaded file if message creation fails
         if (file) {
-            await deleteFile(`/uploads/audio/${file.filename}`);
+            await deleteFile(file.path.includes('cloudinary.com') ? file.path : `/uploads/audio/${file.filename}`);
         }
         throw error;
     }
