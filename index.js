@@ -31,16 +31,22 @@ const server = http.createServer(app);
 const io = setupSocket(server);
 
 // CORS Configuration - MUST BE BEFORE OTHER MIDDLEWARE
+// CORS Configuration - MUST BE BEFORE OTHER MIDDLEWARE
 const corsOptions = {
     origin: function (origin, callback) {
         // Allow requests with no origin (like mobile apps, Postman, curl)
         if (!origin) return callback(null, true);
         
+        // Parse CORS_ORIGIN - can be comma-separated list
+        const envOrigins = process.env.CORS_ORIGIN 
+            ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
+            : [];
+        
         const allowedOrigins = [
             'http://localhost:5173',
             'http://localhost:5174',
             'http://localhost:3000',
-            process.env.CORS_ORIGIN
+            ...envOrigins
         ].filter(Boolean); // Remove undefined values
         
         if (allowedOrigins.indexOf(origin) !== -1) {
